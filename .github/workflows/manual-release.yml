@@ -92,10 +92,6 @@ jobs:
               raise SystemExit('Expected exactly one fake hash')
           p.write_text(text.replace(fake, os.environ['HASH']))
           PY
-      - name: Validate Nix
-        run: |
-          nix flake check --no-update-lock-file
-          nix build .#default --no-link --no-update-lock-file
       - name: Prepare release commit
         id: commit
         env:
@@ -113,6 +109,31 @@ jobs:
           name: release-commit
           path: release.bundle
           if-no-files-found: error
+
+  validate-nix:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-commit
+          path: ${{ runner.temp }}
+      - name: Checkout release commit
+        env:
+          COMMIT: ${{ needs.prepare.outputs.commit }}
+        run: |
+          git fetch "${{ runner.temp }}/release.bundle" HEAD
+          git checkout --detach "$COMMIT"
+      - uses: cachix/install-nix-action@v31
+      - uses: nix-community/cache-nix-action@v6
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock', 'flake.nix') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+      - name: Validate Nix
+        run: |
+          nix flake check --no-update-lock-file
+          nix build .#default --no-link --no-update-lock-file
 
   build:
     needs: prepare
@@ -156,7 +177,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: [prepare, build]
+    needs: [prepare, build, validate-nix]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
