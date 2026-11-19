@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/masnathan/gaze"
 )
 
 func TestRun(t *testing.T) {
@@ -55,7 +57,7 @@ func TestRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	out.Reset()
-	if code := run([]string{"--full", file}, &out, &stderr); code != 0 || !strings.Contains(out.String(), "/**") || !strings.Contains(out.String(), "@return int") {
+	if code := run([]string{"-vv", file}, &out, &stderr); code != 0 || !strings.Contains(out.String(), "/**") || !strings.Contains(out.String(), "@return int") {
 		t.Fatalf("full docs: exit %d, output %q", code, out.String())
 	}
 	out.Reset()
@@ -63,12 +65,56 @@ func TestRun(t *testing.T) {
 		t.Fatalf("compact docs: exit %d, output %q", code, out.String())
 	}
 	out.Reset()
-	if code := run([]string{"stats"}, &out, &stderr); code != 0 || !strings.Contains(out.String(), "Today") || !strings.Contains(out.String(), "Last 30 days") || !strings.Contains(out.String(), "All time") || !strings.Contains(out.String(), "Tokens (o200k_base estimate)") {
+	if code := run([]string{"stats"}, &out, &stderr); code != 0 || !strings.Contains(out.String(), "Today") || !strings.Contains(out.String(), "Last 30 days") || !strings.Contains(out.String(), "All time") || !strings.Contains(out.String(), "Tokens saved") {
 		t.Fatalf("stats: exit %d, output %q, stderr %q", code, out.String(), stderr.String())
 	}
 	out.Reset()
-	if code := run([]string{"--no-lines", "--no-docs", file}, &out, &stderr); code != 0 || strings.TrimSpace(out.String()) != "fn countItems(): int" {
+	if code := run([]string{"--minimal", file}, &out, &stderr); code != 0 || strings.TrimSpace(out.String()) != "fn countItems(): int" {
 		t.Fatalf("compact options: exit %d, output %q", code, out.String())
+	}
+}
+
+func TestRunVerbosity(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	file := filepath.Join(t.TempDir(), "example.php")
+	source := "<?php\n/** Example documentation.\n * More details.\n */\nclass Example {\n public function visible(): void {}\n private function hidden(): void {}\n}\n"
+	if err := os.WriteFile(file, []byte(source), 0644); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name  string
+		flags []string
+		opts  gaze.Options
+	}{
+		{"default", nil, gaze.Options{}},
+		{"minimal", []string{"--minimal"}, gaze.Options{NoLines: true, NoDocs: true}},
+		{"v", []string{"-v"}, gaze.Options{IncludeNonPublic: true}},
+		{"vv", []string{"-vv"}, gaze.Options{FullDocs: true}},
+		{"vvv", []string{"-vvv"}, gaze.Options{IncludeNonPublic: true, FullDocs: true}},
+		{"combined", []string{"-v", "-vv"}, gaze.Options{IncludeNonPublic: true, FullDocs: true}},
+		{"minimal-full", []string{"--minimal", "-vv"}, gaze.Options{NoLines: true, NoDocs: true, FullDocs: true}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var got, stderr bytes.Buffer
+			if code := run(append(tc.flags, file), &got, &stderr); code != 0 {
+				t.Fatalf("exit %d: %s", code, stderr.String())
+			}
+			want, err := gaze.Outline(file, []byte(source), tc.opts)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.String() != want {
+				t.Fatalf("got %q, want %q", got.String(), want)
+			}
+		})
+	}
+	for _, old := range []string{"--all", "--full", "--no-lines", "--no-docs"} {
+		t.Run("reject "+old, func(t *testing.T) {
+			var out, stderr bytes.Buffer
+			if code := run([]string{old, file}, &out, &stderr); code == 0 {
+				t.Fatalf("removed flag %s succeeded", old)
+			}
+		})
 	}
 }
 

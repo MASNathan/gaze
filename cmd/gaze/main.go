@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -41,7 +42,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 			m    stats.Metrics
 		}{{"Today", today}, {"Last 30 days", month}, {"All time", all}} {
 			m := item.m
-			if _, err := fmt.Fprintf(stdout, "%s\n  Scans: %d (failed: %d)\n  Files: %d (failed: %d)\n  Bytes: %d input, %d output\n  Tokens (o200k_base estimate): %d input, %d output, %d saved\n  Processing time: %s\n", item.name, m.Scans, m.FailedScans, m.Files, m.FailedFiles, m.InputBytes, m.OutputBytes, m.InputTokens, m.OutputTokens, m.InputTokens-m.OutputTokens, time.Duration(m.DurationNS)); err != nil {
+			if err := printStats(stdout, item.name, m); err != nil {
 				fmt.Fprintf(stderr, "gaze: stats: %v\n", err)
 				return 1
 			}
@@ -50,12 +51,12 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	flags := flag.NewFlagSet("gaze", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	all := flags.Bool("all", false, "include private and protected members")
-	full := flags.Bool("full", false, "preserve full documentation comments")
-	noLines := flags.Bool("no-lines", false, "omit line ranges")
-	noDocs := flags.Bool("no-docs", false, "omit documentation text")
+	minimal := flags.Bool("minimal", false, "omit line ranges and documentation text")
+	verbose := flags.Bool("v", false, "include non-public members")
+	moreVerbose := flags.Bool("vv", false, "preserve full documentation comments")
+	mostVerbose := flags.Bool("vvv", false, "include non-public members and preserve full documentation comments")
 	flags.Usage = func() {
-		fmt.Fprintln(stderr, "Usage: gaze [--all] [--full] [--no-lines] [--no-docs] <file-or-directory>\n       gaze stats")
+		fmt.Fprintln(stderr, "Usage: gaze [options] <file-or-directory-or-url>\n       gaze stats")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -72,80 +73,88 @@ func run(args []string, stdout, stderr io.Writer) int {
 	m := stats.Metrics{Scans: 1}
 	failed := false
 	path := flags.Arg(0)
-	info, err := os.Stat(path)
-	if err != nil {
+	printFile := func(name, headingName string, source []byte, heading bool, err error) {
+		m.Files++
+		if err == nil {
+			m.InputBytes += int64(len(source))
+			var count int
+			count, err = tokens.Count(source)
+			if err == nil {
+				m.InputTokens += int64(count)
+			}
+		}
+		if err == nil {
+			var outline string
+			outline, err = gaze.Outline(name, source, gaze.Options{IncludeNonPublic: *verbose || *mostVerbose, FullDocs: *moreVerbose || *mostVerbose, NoLines: *minimal, NoDocs: *minimal})
+			if err == nil && outline != "" {
+				output := outline
+				if heading {
+					output = "\n" + headingName + ":\n" + outline
+				}
+				var n int
+				n, err = io.WriteString(stdout, output)
+				m.OutputBytes += int64(n)
+				if n > 0 {
+					count, countErr := tokens.Count([]byte(output[:n]))
+					if countErr != nil {
+						err = countErr
+					} else {
+						m.OutputTokens += int64(count)
+					}
+				}
+			}
+		}
+		if err != nil {
+			m.FailedFiles++
+			fmt.Fprintf(stderr, "gaze: %s: %v\n", name, err)
+			failed = true
+		}
+	}
+	parsed, parseErr := url.Parse(path)
+	if parseErr == nil && (parsed.Scheme == "http" || parsed.Scheme == "https") {
+		err := remoteScan(path, func(name string, source []byte, heading bool) {
+			printFile(name, name, source, heading, nil)
+		})
+		if err != nil {
+			fmt.Fprintf(stderr, "gaze: %v\n", err)
+			failed = true
+		}
+	} else if info, err := os.Stat(path); err != nil {
 		fmt.Fprintf(stderr, "gaze: %s: %v\n", path, err)
 		failed = true
 	} else if !info.IsDir() && !supportedFile(path) {
 		fmt.Fprintf(stderr, "gaze: %s: unsupported file type\n", path)
 		failed = true
+	} else if !info.IsDir() {
+		source, err := os.ReadFile(path)
+		printFile(path, path, source, false, err)
 	} else {
-		printFile := func(name string, heading bool) {
-			m.Files++
-			source, err := os.ReadFile(name)
-			if err == nil {
-				m.InputBytes += int64(len(source))
-				var count int
-				count, err = tokens.Count(source)
-				if err == nil {
-					m.InputTokens += int64(count)
-				}
-			}
-			if err == nil {
-				var outline string
-				outline, err = gaze.Outline(name, source, gaze.Options{IncludeNonPublic: *all, FullDocs: *full, NoLines: *noLines, NoDocs: *noDocs})
-				if err == nil && outline != "" {
-					output := outline
-					if heading {
-						var relative string
-						relative, err = filepath.Rel(path, name)
-						if err == nil {
-							output = "\n" + relative + ":\n" + outline
-						}
-					}
-					if err == nil {
-						var n int
-						n, err = io.WriteString(stdout, output)
-						m.OutputBytes += int64(n)
-						if n > 0 {
-							count, countErr := tokens.Count([]byte(output[:n]))
-							if countErr != nil {
-								err = countErr
-							} else {
-								m.OutputTokens += int64(count)
-							}
-						}
-					}
-				}
-			}
-			if err != nil {
-				m.FailedFiles++
-				fmt.Fprintf(stderr, "gaze: %s: %v\n", name, err)
+		err := filepath.WalkDir(path, func(name string, entry fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				fmt.Fprintf(stderr, "gaze: %s: %v\n", name, walkErr)
 				failed = true
-			}
-		}
-		if !info.IsDir() {
-			printFile(path, false)
-		} else {
-			err = filepath.WalkDir(path, func(name string, entry fs.DirEntry, walkErr error) error {
-				if walkErr != nil {
-					fmt.Fprintf(stderr, "gaze: %s: %v\n", name, walkErr)
-					failed = true
-					if entry != nil && !entry.IsDir() {
-						m.Files++
-						m.FailedFiles++
-					}
-					return nil
-				}
-				if entry.Type().IsRegular() && supportedFile(name) {
-					printFile(name, true)
+				if entry != nil && !entry.IsDir() {
+					m.Files++
+					m.FailedFiles++
 				}
 				return nil
-			})
-			if err != nil {
-				fmt.Fprintf(stderr, "gaze: %s: %v\n", path, err)
-				failed = true
 			}
+			if entry.Type().IsRegular() && supportedFile(name) {
+				source, readErr := os.ReadFile(name)
+				relative, relErr := filepath.Rel(path, name)
+				if readErr == nil && relErr != nil {
+					readErr = relErr
+				}
+				if relErr != nil {
+					relative = name
+				}
+				printFile(name, relative, source, true, readErr)
+			}
+			return nil
+		})
+		if err != nil {
+			fmt.Fprintf(stderr, "gaze: %s: %v\n", path, err)
+			failed = true
 		}
 	}
 	if failed {

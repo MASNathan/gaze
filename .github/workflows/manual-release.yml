@@ -1,0 +1,174 @@
+name: Manual release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: manual-release
+  cancel-in-progress: false
+
+env:
+  CGO_ENABLED: '1'
+  GOFLAGS: -mod=mod
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      commit: ${{ steps.publish.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify default branch and starting commit
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          EVENT_REF: ${{ github.ref }}
+          EVENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$EVENT_REF" = "refs/heads/$DEFAULT_BRANCH"
+          git fetch origin "$DEFAULT_BRANCH"
+          test "$(git rev-parse FETCH_HEAD)" = "$EVENT_SHA"
+          test "$(git rev-parse HEAD)" = "$EVENT_SHA"
+      - uses: cachix/install-nix-action@v31
+      - name: Increment minor version
+        id: version
+        run: |
+          python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+
+          path = Path('flake.nix')
+          text = path.read_text()
+          pattern = r'(?m)^([ \t]*version[ \t]*=[ \t]*")(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)("[ \t]*;)[ \t]*$'
+          matches = list(re.finditer(pattern, text))
+          if len(matches) != 1:
+              raise SystemExit('Expected exactly one semantic version in flake.nix')
+          major, minor = int(matches[0].group(2)), int(matches[0].group(3)) + 1
+          version = f'{major}.{minor}.0'
+          path.write_text(text[:matches[0].start()] + matches[0].group(1) + version + matches[0].group(5) + text[matches[0].end():])
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'tag=v{version}\n')
+          PY
+      - name: Refresh vendor hash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          p = Path('flake.nix')
+          text = p.read_text()
+          text, count = re.subn(r'(vendorHash\s*=\s*")sha256-[A-Za-z0-9+/]{43}=("\s*;)', r'\g<1>sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\2', text)
+          if count != 1:
+              raise SystemExit('Expected exactly one SHA-256 vendorHash')
+          p.write_text(text)
+          PY
+          if nix build .#default --no-link --print-build-logs 2>nix-build.log; then
+            echo 'Unexpected success with fake vendor hash' >&2
+            exit 1
+          fi
+          cat nix-build.log
+          hash=$(sed -nE 's/^[[:space:]]*got:[[:space:]]*(sha256-[A-Za-z0-9+/]{43}=)[[:space:]]*$/\1/p' nix-build.log | sort -u)
+          if ! [[ "$hash" =~ ^sha256-[A-Za-z0-9+/]{43}=$ ]]; then
+            echo 'Could not determine unique vendor hash' >&2
+            exit 1
+          fi
+          HASH="$hash" python3 - <<'PY'
+          import os
+          from pathlib import Path
+          p = Path('flake.nix')
+          text = p.read_text()
+          fake = 'sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
+          if text.count(fake) != 1:
+              raise SystemExit('Expected exactly one fake hash')
+          p.write_text(text.replace(fake, os.environ['HASH']))
+          PY
+      - name: Validate Nix
+        run: |
+          nix flake check --no-update-lock-file
+          nix build .#default --no-link --no-update-lock-file
+      - name: Commit and tag atomically
+        id: publish
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          TAG: ${{ steps.version.outputs.tag }}
+          EVENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git fetch origin "$DEFAULT_BRANCH" --tags
+          test "$(git rev-parse FETCH_HEAD)" = "$EVENT_SHA"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "Tag $TAG already exists" >&2
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add flake.nix
+          git commit -m "Release $TAG"
+          git tag "$TAG"
+          git push --atomic origin "HEAD:refs/heads/$DEFAULT_BRANCH" "refs/tags/$TAG:refs/tags/$TAG"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: linux-amd64
+            arch: amd64
+          - os: ubuntu-24.04-arm
+            target: linux-arm64
+            arch: arm64
+          - os: macos-15-intel
+            target: darwin-amd64
+            arch: amd64
+          - os: macos-15
+            target: darwin-arm64
+            arch: arm64
+          - os: windows-2022
+            target: windows-amd64
+            arch: amd64
+            extension: .exe
+    runs-on: ${{ matrix.os }}
+    env:
+      GOARCH: ${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.x'
+      - run: go test ./...
+      - run: go build -o gaze-${{ matrix.target }}${{ matrix.extension }} ./cmd/gaze
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gaze-${{ matrix.target }}
+          path: gaze-${{ matrix.target }}${{ matrix.extension }}
+          if-no-files-found: error
+
+  release:
+    needs: [prepare, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: gh release create "$TAG" dist/* --verify-tag --generate-notes
