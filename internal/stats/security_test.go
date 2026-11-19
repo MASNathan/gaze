@@ -8,8 +8,7 @@ import (
 )
 
 func TestExistingDirectoryNotChanged(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", dir)
+	dir := testConfigDir(t)
 	path := filepath.Join(dir, "gaze")
 	if err := os.Mkdir(path, 0755); err != nil {
 		t.Fatal(err)
@@ -27,8 +26,7 @@ func TestExistingDirectoryNotChanged(t *testing.T) {
 }
 
 func TestSymlinksRejected(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", dir)
+	dir := testConfigDir(t)
 	target := t.TempDir()
 	path := filepath.Join(dir, "gaze")
 	if err := os.Symlink(target, path); err != nil {

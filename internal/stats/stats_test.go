@@ -8,9 +8,23 @@ import (
 	"time"
 )
 
+func testConfigDir(t *testing.T) string {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "config"))
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
 func TestRecordRead(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", dir)
+	dir := testConfigDir(t)
 	now := time.Date(2026, 3, 1, 0, 30, 0, 0, time.FixedZone("local", -8*3600))
 	today, last, all, err := Read(now)
 	if err != nil || today != (Metrics{}) || last != (Metrics{}) || all != (Metrics{}) {
@@ -42,7 +56,7 @@ func TestRecordRead(t *testing.T) {
 }
 
 func TestConcurrentRecord(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	testConfigDir(t)
 	now := time.Now()
 	const n = 30
 	var wg sync.WaitGroup
@@ -65,8 +79,7 @@ func TestConcurrentRecord(t *testing.T) {
 }
 
 func TestMigration(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", dir)
+	dir := testConfigDir(t)
 	if err := os.MkdirAll(filepath.Join(dir, "gaze"), 0700); err != nil {
 		t.Fatal(err)
 	}

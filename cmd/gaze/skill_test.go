@@ -14,12 +14,16 @@ func TestInstallSkill(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, "config"))
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		t.Fatal(err)
+	}
 	var out, stderr bytes.Buffer
 	if code := installSkill([]string{"-agents=claude,opencode", "-scope=user"}, strings.NewReader(""), &out, &stderr); code != 0 {
 		t.Fatalf("install: %s", stderr.String())
 	}
-	for _, p := range []string{".claude/skills/gaze-cli/SKILL.md", "config/opencode/skills/gaze-cli/SKILL.md"} {
-		if _, err := os.Stat(filepath.Join(dir, p)); err != nil {
+	for _, p := range []string{filepath.Join(dir, ".claude/skills/gaze-cli/SKILL.md"), filepath.Join(configDir, "opencode/skills/gaze-cli/SKILL.md")} {
+		if _, err := os.Stat(p); err != nil {
 			t.Fatal(err)
 		}
 	}

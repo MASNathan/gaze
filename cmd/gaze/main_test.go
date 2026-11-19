@@ -11,8 +11,15 @@ import (
 	"github.com/masnathan/gaze"
 )
 
+func testConfigDir(t *testing.T) {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "config"))
+}
+
 func TestRun(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	testConfigDir(t)
 	dir := t.TempDir()
 	if err := os.Mkdir(filepath.Join(dir, "nested"), 0755); err != nil {
 		t.Fatal(err)
@@ -75,7 +82,7 @@ func TestRun(t *testing.T) {
 }
 
 func TestRunVerbosity(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	testConfigDir(t)
 	file := filepath.Join(t.TempDir(), "example.php")
 	source := "<?php\n/** Example documentation.\n * More details.\n */\nclass Example {\n public function visible(): void {}\n private function hidden(): void {}\n}\n"
 	if err := os.WriteFile(file, []byte(source), 0644); err != nil {
