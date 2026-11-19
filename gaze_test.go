@@ -31,7 +31,7 @@ func TestOutline(t *testing.T) {
 	if strings.Contains(compact, "\n * @return") || !strings.Contains(full, "\n * @return") {
 		t.Fatalf("unexpected docs: compact=%q full=%q", compact, full)
 	}
-	if _, err := Outline("example.js", source, Options{}); err == nil {
+	if _, err := Outline("example.txt", source, Options{}); err == nil {
 		t.Fatal("unsupported language succeeded")
 	}
 }

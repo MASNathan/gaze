@@ -17,6 +17,18 @@ import (
 
 func main() { os.Exit(run(os.Args[1:], os.Stdout, os.Stderr)) }
 
+func supportedFile(name string) bool {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".php", ".go", ".js", ".mjs", ".cjs", ".py",
+		".ts", ".tsx", ".mts", ".cts", ".rs", ".java", ".kt", ".kts", ".cs",
+		".c", ".h", ".cc", ".cpp", ".cxx", ".hh", ".hpp", ".hxx",
+		".rb", ".sh", ".bash", ".dart", ".scala", ".sc", ".ex", ".exs",
+		".lua", ".r", ".zig", ".m", ".mm", ".html", ".htm", ".css":
+		return true
+	}
+	return false
+}
+
 func run(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && args[0] == "stats" {
 		today, month, all, err := stats.Read(time.Now())
@@ -64,7 +76,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		fmt.Fprintf(stderr, "gaze: %s: %v\n", path, err)
 		failed = true
-	} else if !info.IsDir() && !strings.EqualFold(filepath.Ext(path), ".php") {
+	} else if !info.IsDir() && !supportedFile(path) {
 		fmt.Fprintf(stderr, "gaze: %s: unsupported file type\n", path)
 		failed = true
 	} else {
@@ -125,7 +137,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 					}
 					return nil
 				}
-				if entry.Type().IsRegular() && strings.EqualFold(filepath.Ext(name), ".php") {
+				if entry.Type().IsRegular() && supportedFile(name) {
 					printFile(name, true)
 				}
 				return nil

@@ -150,7 +150,7 @@ func phpOutlineOptions(source []byte, opts Options) (string, error) {
 					}
 				}
 				if !opts.NoDocs && len(lines) > 0 {
-					fmt.Fprintf(&out, "%s%s\n", indent, strings.Join(lines, " | "))
+					fmt.Fprintf(&out, "%s%s\n", indent, compactDoc(strings.Join(lines, " | ")))
 				}
 			}
 		}

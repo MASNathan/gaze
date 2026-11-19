@@ -2,7 +2,7 @@
 
 **See the shape of your code, not the noise.**
 
-Gaze turns PHP source into a compact outline of its contracts: declarations, signatures, and documentation, without implementation bodies. Use it to explore unfamiliar code or give an AI assistant focused context.
+Gaze turns source code into a compact outline of its contracts: declarations, signatures, and documentation, without implementation bodies. Use it to explore unfamiliar code or give an AI assistant focused context.
 
 ```php
 /** Finds customers by email. */
@@ -21,7 +21,7 @@ class CustomerRepository
   fn find(string $email): ?Customer
 ```
 
-PHP is the only supported language today. Go and JavaScript are planned.
+Supported extensions: PHP (`.php`), Go (`.go`), JavaScript (`.js`, `.mjs`, `.cjs`), TypeScript (`.ts`, `.mts`, `.cts`, `.tsx`), Python (`.py`), Rust (`.rs`), Java (`.java`), Kotlin (`.kt`, `.kts`), C# (`.cs`), C (`.c`, `.h`), C++ (`.cc`, `.cpp`, `.cxx`, `.hh`, `.hpp`, `.hxx`), Ruby (`.rb`), shell (`.sh`, `.bash`), Dart (`.dart`), Scala (`.scala`, `.sc`), Elixir (`.ex`, `.exs`), Lua (`.lua`), R (`.r`), Zig (`.zig`), Objective-C (`.m`, `.mm`), HTML (`.html`, `.htm`), and CSS (`.css`). Ambiguous `.h` headers use the C parser. Shell files use the Bash parser; extensionless scripts are not detected.
 
 ## Get started
 
@@ -46,9 +46,11 @@ Directory results are ordered by path, with headings relative to the scanned dir
 
 ### Reading an outline
 
+By default, documentation prose is shortened by removing some English articles and filler words and replacing selected expressions; wording and meaning may change. Text containing code-like markup is left unchanged. Use `--full` to retain original documentation.
+
 Compact output uses `fn` as shorthand for `function`, not PHP arrow-function syntax. It merges unambiguous PHPDoc types into signatures, even with `--no-docs`: **displayed types are not necessarily enforced by PHP**. Compact output also omits `@inheritDoc`; use `--full` to retain original docblocks and distinguish declared types.
 
-Imports, attributes, and implementation bodies are omitted. Simple literal defaults are shown; complex expressions become `…`. Syntax errors can yield partial outlines. Output is presentation text, not a stable machine-readable format.
+Imports and implementation bodies are omitted. PHP shows simple literal defaults and replaces complex expressions with `…`; other languages may redact defaults and initializers. Go hides unexported names, Python hides single-underscore and name-mangled names (but retains special methods), and JavaScript hides `#` private members; `--all` includes them. JavaScript outlines include non-exported top-level declarations. Syntax errors can yield partial outlines. Output is presentation text, not a stable machine-readable format.
 
 ## Local statistics
 
