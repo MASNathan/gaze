@@ -1,8 +1,24 @@
 # gaze
 
-**See the shape of your code, not the noise.**
+**Understand the code. Skip the implementation noise.**
 
-Gaze turns source files into compact outlines: declarations, signatures and documentation, without implementation bodies. Explore an unfamiliar project, review an API or give an AI assistant focused context.
+[![CI](https://github.com/masnathan/gaze/actions/workflows/ci.yml/badge.svg)](https://github.com/masnathan/gaze/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/masnathan/gaze)](https://github.com/masnathan/gaze/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+Gaze is an open-source CLI and Go library that turns source code into compact outlines: declarations, signatures and documentation, without implementation bodies. Get oriented in an unfamiliar codebase, review an API, or give your AI coding assistant focused context instead of entire files.
+
+- **22 languages** — from Go, PHP and TypeScript to Rust, Python and C++.
+- **Files, folders and public repositories** — explore local code or pass a GitHub, GitLab.com or Codeberg URL.
+- **Control the detail** — public APIs by default, private declarations and full documentation when you need them.
+- **Built for humans and agents** — readable terminal output and installable skills for Claude Code, Codex and OpenCode.
+- **Measure your savings** — local token statistics, without storing source code, paths or URLs.
+
+[Install](#install) · [Quick start](#quick-start) · [Agent setup](#agent-skill) · [Languages](#supported-languages) · [Contribute](#contributing)
+
+## See it in action
+
+Source:
 
 ```php
 /** Finds customers by email. */
@@ -22,19 +38,77 @@ class CustomerRepository
 
 ## Install
 
-**Nix** (flakes enabled):
+### Download a binary
+
+No Go toolchain or C compiler needed to use a release binary. Open [the latest release](https://github.com/masnathan/gaze/releases/latest) and download the file for your system:
+
+| System | Architecture | Release file |
+| --- | --- | --- |
+| Linux | x86-64 | `gaze-linux-amd64` |
+| Linux | ARM64 | `gaze-linux-arm64` |
+| macOS | Apple Silicon | `gaze-darwin-arm64` |
+| macOS | Intel | `gaze-darwin-amd64` |
+| Windows | x86-64 | `gaze-windows-amd64.exe` |
+
+On Linux or macOS, open a terminal in the download folder. Replace the filename below with the one you downloaded:
+
+```sh
+mkdir -p "$HOME/.local/bin"
+install -m 755 gaze-linux-amd64 "$HOME/.local/bin/gaze"
+export PATH="$HOME/.local/bin:$PATH"
+gaze --help
+```
+
+Add `export PATH="$HOME/.local/bin:$PATH"` to your shell configuration to keep it available in new terminals. Release binaries are built on Ubuntu 24.04, macOS 15 and Windows Server 2022; older systems may need a source build.
+
+On Windows, rename the downloaded file to `gaze.exe` and run `.\gaze.exe --help` from PowerShell in that folder. Add its folder to your user `PATH` to run `gaze` from anywhere.
+
+### Nix
+
+With flakes enabled:
+
 
 ```sh
 nix profile install github:masnathan/gaze
 ```
 
-**Go** (Go 1.27 or later, CGO and a C compiler required):
+### Go
+
+Requires **Go 1.27 or later**, **CGO** and a **C compiler** such as GCC or Clang:
 
 ```sh
 CGO_ENABLED=1 go install github.com/masnathan/gaze/cmd/gaze@latest
 ```
 
-Ensure `GOBIN` (or `GOPATH/bin`) is in your `PATH`. Both commands require public access to the repository. From a clone, use `nix profile install path:.` or `CGO_ENABLED=1 GOFLAGS=-mod=mod go install ./cmd/gaze`.
+Ensure `GOBIN` (or `$(go env GOPATH)/bin` when `GOBIN` is unset) is in your `PATH`, then run `gaze --help`. If compilation cannot find your C compiler, set `CC=gcc` or `CC=clang` to an installed compiler.
+
+Prefer building a checkout? See [development](#develop).
+
+## Quick start
+
+From your project folder:
+
+```sh
+# See the public API across your project
+gaze .
+
+# Keep only declarations and signatures
+gaze --minimal .
+
+# Include private and internal declarations
+gaze -v .
+
+# Check token savings from your scans
+gaze stats
+```
+
+Or explore this repository without cloning it:
+
+```sh
+gaze https://github.com/masnathan/gaze
+```
+
+Need your AI assistant to use Gaze? Install the [agent skill](#agent-skill) next.
 
 ## Agent skill
 
@@ -194,14 +268,31 @@ outline, err := gaze.Outline("service.php", source, gaze.Options{
 
 Run the release workflow manually from GitHub Actions to increment the minor version, update the Nix package, and create the tag and GitHub Release. Release builds target Linux and macOS (amd64 and arm64) and Windows (amd64). Pull requests and branch pushes run Linux tests only.
 
+## Contributing
+
+Bug reports, documentation improvements and language-support fixes are welcome.
+
+- [Report a bug](https://github.com/masnathan/gaze/issues): include your OS, Gaze version, command, a small source example, and expected versus actual output. Remove secrets and private code before posting.
+- [Suggest an improvement](https://github.com/masnathan/gaze/issues): describe the use case and the output you would find useful.
+- Submit a pull request: keep changes focused, add a regression test for behavior changes, and run the tests below. For larger changes, open an issue first to discuss scope.
+
+Gaze is an independent MIT implementation inspired by zat. Contributions must not copy zat code, queries, fixtures, snapshots or documentation.
+
 ## Develop
 
+Requires Go 1.27 or later and a C compiler, with CGO enabled.
+
 ```sh
+git clone https://github.com/masnathan/gaze.git
+cd gaze
 CGO_ENABLED=1 GOFLAGS=-mod=mod go test ./...
 CGO_ENABLED=1 GOFLAGS=-mod=mod go build -o gaze ./cmd/gaze
+./gaze --help
 ```
 
-Set `CC` if your C compiler is not found automatically. The Makefile uses the existing `vendor` directory. `make dep` replaces it using `go mod vendor`, which can omit C sources and headers required by the Tree-sitter bindings; use module mode as above if vendor-mode builds fail.
+Install your checkout with `CGO_ENABLED=1 GOFLAGS=-mod=mod go install ./cmd/gaze`, or `nix profile install path:.` with Nix.
+
+Set `CC` if your C compiler is not found automatically. The Makefile uses module mode for builds and tests. `make dep` replaces the `vendor` directory using `go mod vendor`, which can omit C sources and headers required by the Tree-sitter bindings; use module mode as above if vendor-mode builds fail.
 
 ## License
 
