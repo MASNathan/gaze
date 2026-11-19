@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"os"
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/term"
 	"github.com/masnathan/gaze/internal/stats"
 )
 
@@ -20,7 +23,15 @@ func printStats(w io.Writer, name string, m stats.Metrics) error {
 		bar = strings.Repeat("█", filled) + strings.Repeat("░", width-filled)
 		percent = fmt.Sprintf("%.1f%%", saved)
 	}
-	_, err := fmt.Fprintf(w, "\n%s\n  Tokens saved  %s  %s\n  Tokens  %s → %s  (%s saved)\n  Scans  %d (%d failed)   Files  %d (%d failed)   Time  %s\n", name, bar, percent, compactTokens(m.InputTokens), compactTokens(m.OutputTokens), compactTokens(m.InputTokens-m.OutputTokens), m.Scans, m.FailedScans, m.Files, m.FailedFiles, time.Duration(m.DurationNS))
+	content := fmt.Sprintf("Tokens saved  %s  %s\nTokens  %s → %s  (%s saved)\nScans  %d (%d failed)   Files  %d (%d failed)   Time  %s", bar, percent, compactTokens(m.InputTokens), compactTokens(m.OutputTokens), compactTokens(m.InputTokens-m.OutputTokens), m.Scans, m.FailedScans, m.Files, m.FailedFiles, time.Duration(m.DurationNS))
+	if f, ok := w.(*os.File); ok && term.IsTerminal(f.Fd()) {
+		r := lipgloss.NewRenderer(w)
+		title := r.NewStyle().Bold(true).Foreground(lipgloss.Color("39")).Render(name)
+		panel := r.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("39")).Padding(0, 1).Render(title + "\n" + content)
+		_, err := fmt.Fprintln(w, panel)
+		return err
+	}
+	_, err := fmt.Fprintf(w, "\n%s\n  %s\n", name, strings.ReplaceAll(content, "\n", "\n  "))
 	return err
 }
 

@@ -36,6 +36,26 @@ CGO_ENABLED=1 go install github.com/masnathan/gaze/cmd/gaze@latest
 
 Ensure `GOBIN` (or `GOPATH/bin`) is in your `PATH`. Both commands require public access to the repository. From a clone, use `nix profile install path:.` or `CGO_ENABLED=1 GOFLAGS=-mod=mod go install ./cmd/gaze`.
 
+## Agent skill
+
+Run `gaze skill` to detect installed Claude Code, Codex, and OpenCode CLIs, select agents, and choose project or user scope. Use arrow keys to navigate, space to select agents, and Enter to confirm each choice. The command shows destination paths before confirmation. Existing skills at selected destinations are replaced.
+
+For noninteractive installation, specify both options, for example:
+
+```sh
+gaze skill --agents=claude,codex --scope=user
+```
+
+Supported agent names are `claude`, `codex`, and `opencode`; scope is `project` or `user`. Explicit agent names do not require the corresponding CLI to be on `PATH`.
+
+Update all existing skill installations without prompts:
+
+```sh
+gaze skill --update
+```
+
+This checks the current project's and user's standard skill locations for Claude Code, Codex, and OpenCode, including OpenCode installations invoked as `opencode2`. It replaces existing skill files but does not create missing installations. If none are found, the command exits with an error. `--update` cannot be combined with `--agents` or `--scope`.
+
 ## Start exploring
 
 ```sh
@@ -139,6 +159,8 @@ Compact output uses `fn` as shorthand for `function`, not PHP arrow-function syn
 PHP shows simple literal defaults and replaces complex expressions with `…`; other languages may redact defaults and initializers. Syntax errors can yield partial outlines. Output is presentation text, not a stable machine-readable format.
 
 ## Local statistics
+
+In a terminal, statistics appear in styled panels. Redirected output remains plain text without ANSI styling.
 
 `gaze stats` shows today, the last 30 calendar days (including today), and all time, in local time:
 

@@ -35,6 +35,9 @@ func TestPrintStats(t *testing.T) {
 			t.Fatalf("output %q; want %q", out.String(), want)
 		}
 	}
+	if strings.Contains(out.String(), "\x1b[") {
+		t.Fatalf("non-terminal output contains ANSI escapes: %q", out.String())
+	}
 	if strings.Contains(out.String(), "Bytes") || strings.Contains(out.String(), "o200k") {
 		t.Fatalf("unexpected detail in output: %q", out.String())
 	}

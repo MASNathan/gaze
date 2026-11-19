@@ -31,6 +31,9 @@ func supportedFile(name string) bool {
 }
 
 func run(args []string, stdout, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "skill" {
+		return installSkill(args[1:], os.Stdin, stdout, stderr)
+	}
 	if len(args) == 1 && args[0] == "stats" {
 		today, month, all, err := stats.Read(time.Now())
 		if err != nil {
@@ -56,7 +59,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	moreVerbose := flags.Bool("vv", false, "preserve full documentation comments")
 	mostVerbose := flags.Bool("vvv", false, "include non-public members and preserve full documentation comments")
 	flags.Usage = func() {
-		fmt.Fprintln(stderr, "Usage: gaze [options] <file-or-directory-or-url>\n       gaze stats")
+		fmt.Fprintln(stderr, "Usage: gaze [options] <file-or-directory-or-url>\n       gaze stats\n       gaze skill [options]")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
