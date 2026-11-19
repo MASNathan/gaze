@@ -1,4 +1,4 @@
-.PHONY: install build test dep dep-update
+.PHONY: install uninstall build test dep dep-update
 
 install: dep
 	@if [ -n "$$CC" ] || command -v gcc >/dev/null 2>&1; then \
@@ -8,6 +8,16 @@ install: dep
 	else \
 		echo 'C compiler required: install gcc or set CC' >&2; exit 1; \
 	fi
+
+uninstall:
+	@bin="$$(go env GOBIN)" || exit 1; \
+	if [ -z "$$bin" ]; then \
+		gopath="$$(go env GOPATH)" || exit 1; \
+		[ -n "$$gopath" ] || exit 1; \
+		bin="$${gopath%%:*}/bin"; \
+	fi; \
+	ext="$$(go env GOEXE)" || exit 1; \
+	rm -f -- "$$bin/gaze$$ext"
 
 build:
 	@if [ -n "$$CC" ] || command -v gcc >/dev/null 2>&1; then \
