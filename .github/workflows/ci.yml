@@ -3,7 +3,19 @@ name: CI
 on:
   push:
     branches: ['**']
+    paths:
+      - '**/*.go'
+      - '**/go.mod'
+      - '**/go.sum'
+      - '**/go.work'
+      - '**/go.work.sum'
   pull_request:
+    paths:
+      - '**/*.go'
+      - '**/go.mod'
+      - '**/go.sum'
+      - '**/go.work'
+      - '**/go.work.sum'
 
 permissions:
   contents: read
