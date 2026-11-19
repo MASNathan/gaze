@@ -128,16 +128,9 @@ jobs:
           - os: ubuntu-24.04-arm
             target: linux-arm64
             arch: arm64
-          - os: macos-15-intel
-            target: darwin-amd64
-            arch: amd64
           - os: macos-15
             target: darwin-arm64
             arch: arm64
-          - os: windows-2022
-            target: windows-amd64
-            arch: amd64
-            extension: .exe
     runs-on: ${{ matrix.os }}
     env:
       GOARCH: ${{ matrix.arch }}
@@ -149,11 +142,11 @@ jobs:
         with:
           go-version: '1.27.x'
       - run: go test ./...
-      - run: go build -o gaze-${{ matrix.target }}${{ matrix.extension }} ./cmd/gaze
+      - run: go build -o gaze-${{ matrix.target }} ./cmd/gaze
       - uses: actions/upload-artifact@v4
         with:
           name: gaze-${{ matrix.target }}
-          path: gaze-${{ matrix.target }}${{ matrix.extension }}
+          path: gaze-${{ matrix.target }}
           if-no-files-found: error
 
   release:

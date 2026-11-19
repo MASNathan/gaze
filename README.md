@@ -47,8 +47,6 @@ No Go toolchain or C compiler needed to use a release binary. Open [the latest r
 | Linux | x86-64 | `gaze-linux-amd64` |
 | Linux | ARM64 | `gaze-linux-arm64` |
 | macOS | Apple Silicon | `gaze-darwin-arm64` |
-| macOS | Intel | `gaze-darwin-amd64` |
-| Windows | x86-64 | `gaze-windows-amd64.exe` |
 
 On Linux or macOS, open a terminal in the download folder. Replace the filename below with the one you downloaded:
 
@@ -59,9 +57,7 @@ export PATH="$HOME/.local/bin:$PATH"
 gaze --help
 ```
 
-Add `export PATH="$HOME/.local/bin:$PATH"` to your shell configuration to keep it available in new terminals. Release binaries are built on Ubuntu 24.04, macOS 15 and Windows Server 2022; older systems may need a source build.
-
-On Windows, rename the downloaded file to `gaze.exe` and run `.\gaze.exe --help` from PowerShell in that folder. Add its folder to your user `PATH` to run `gaze` from anywhere.
+Add `export PATH="$HOME/.local/bin:$PATH"` to your shell configuration to keep it available in new terminals. Release binaries are built on Ubuntu 24.04 and macOS 15; older systems may need a source build. Release binaries for Intel macOS and Windows are not currently provided.
 
 ### Nix
 
