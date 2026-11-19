@@ -14,13 +14,13 @@
         in {
           default = pkgs.buildGoModule.override { go = pkgs.go_1_27; } {
             pname = "gaze";
-            version = "0.1.0";
+            version = "0.2.0";
             src = nixpkgs.lib.cleanSourceWith {
               src = ./.;
               filter = path: type: baseNameOf path != "vendor" && nixpkgs.lib.cleanSourceFilter path type;
             };
             proxyVendor = true;
-            vendorHash = "sha256-4H30ndWQojXtNCYwJmE2PIkuSsET/TXlvRkCZq/isCk=";
+            vendorHash = "sha256-ophPnxoFpAYpNSHHVenCbteMorvpEnFnTYVEY+YD1ZA=";
             subPackages = [ "cmd/gaze" ];
             env.CGO_ENABLED = 1;
             meta = {
