@@ -14,7 +14,7 @@
         in {
           default = pkgs.buildGoModule.override { go = pkgs.go_1_27; } {
             pname = "gaze";
-            version = "0.2.0";
+            version = "0.3.0";
             src = nixpkgs.lib.cleanSourceWith {
               src = ./.;
               filter = path: type: baseNameOf path != "vendor" && nixpkgs.lib.cleanSourceFilter path type;
